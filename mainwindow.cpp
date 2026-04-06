@@ -183,7 +183,12 @@ void MainWindow::on_sliderInputSpinBox_editingFinished()
 
 void MainWindow::on_processNameFilter_textChanged(const QString &text)
 {
-    m_processMonitor->setFilter(text);
+    m_searchDebounceTimer->start(300); // 300ms debounce to avoid UI lag
+}
+
+void MainWindow::applySearchFilter()
+{
+    m_processMonitor->setFilter(ui->processNameFilter->text());
 }
 
 void MainWindow::on_sliderLabel_clicked()
@@ -254,6 +259,15 @@ void MainWindow::createTray()
     // 添加动作到菜单
     trayMenu->addAction(showAction);
     trayMenu->addAction(hideAction);
+    trayMenu->addSeparator();
+    
+    QAction* alwaysOnTopTrayAction = new QAction(tr("始终置顶"), this);
+    alwaysOnTopTrayAction->setCheckable(true);
+    alwaysOnTopTrayAction->setChecked(m_alwaysOnTop);
+    connect(alwaysOnTopTrayAction, &QAction::toggled, ui->actionAlwaysOnTop, &QAction::setChecked);
+    connect(ui->actionAlwaysOnTop, &QAction::toggled, alwaysOnTopTrayAction, &QAction::setChecked);
+    trayMenu->addAction(alwaysOnTopTrayAction);
+
     trayMenu->addAction(miniAction);
     trayMenu->addSeparator();
     trayMenu->addAction(quitAction);
@@ -366,9 +380,20 @@ void MainWindow::init()
 
     m_rampingTimer = new QTimer(this);
     connect(m_rampingTimer, &QTimer::timeout, this, &MainWindow::updateRamping);
+    
+    m_searchDebounceTimer = new QTimer(this);
+    m_searchDebounceTimer->setSingleShot(true);
+    connect(m_searchDebounceTimer, &QTimer::timeout, this, &MainWindow::applySearchFilter);
+
     m_currentFactor = 1.0;
     m_targetFactor = 1.0;
     m_isMiniMode = false;
+    
+    // 初始化窗口置顶
+    m_alwaysOnTop = m_settings->value("MainWindow/AlwaysOnTop", false).toBool();
+    ui->actionAlwaysOnTop->setChecked(m_alwaysOnTop);
+    on_alwaysOnTopAction_triggered(m_alwaysOnTop);
+    connect(ui->actionAlwaysOnTop, &QAction::toggled, this, &MainWindow::on_alwaysOnTopAction_triggered);
 
     /* 读取slider值 */
     int value = qBound(ui->sliderCtrl->minimum(),
@@ -676,5 +701,23 @@ void MainWindow::on_autoStartCheckBox_stateChanged(int state)
     {
         winutils::setAutoStart(false, QApplication::applicationName(),
                                execFilePath);
+    }
+}
+
+void MainWindow::on_alwaysOnTopAction_triggered(bool checked)
+{
+    m_alwaysOnTop = checked;
+    m_settings->setValue("MainWindow/AlwaysOnTop", checked);
+    
+    Qt::WindowFlags flags = windowFlags();
+    if (checked) {
+        flags |= Qt::WindowStaysOnTopHint;
+    } else {
+        flags &= ~Qt::WindowStaysOnTopHint;
+    }
+    
+    if (flags != windowFlags()) {
+        setWindowFlags(flags);
+        show(); // 标志改变后需要重新显示
     }
 }

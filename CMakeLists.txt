@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(OpenSpeedy VERSION 1.7.7 LANGUAGES CXX)
+project(OpenSpeedy VERSION 1.8.0 LANGUAGES CXX)
 
 
 set(CMAKE_AUTOUIC ON)

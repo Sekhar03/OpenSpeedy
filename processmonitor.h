@@ -59,6 +59,9 @@ void start();
 
 private slots:
 void onItemChanged(QTreeWidgetItem* item, int column);
+void showContextMenu(const QPoint& pos);
+void openFolder();
+void terminateProcess();
 
 private:
 QTreeWidget* m_treeWidget;

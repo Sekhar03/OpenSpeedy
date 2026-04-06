@@ -66,6 +66,8 @@ class MainWindow
     void on_sliderLabel_clicked();
 
     void on_autoStartCheckBox_stateChanged(int arg1);
+    void on_alwaysOnTopAction_triggered(bool checked);
+    void applySearchFilter();
 
   private:
     Ui::MainWindow* ui;
@@ -115,6 +117,8 @@ class MainWindow
     double m_targetFactor;
     double m_currentFactor;
     QTimer* m_rampingTimer;
+    QTimer* m_searchDebounceTimer;
     bool m_isMiniMode;
+    bool m_alwaysOnTop;
 };
 #endif // MAINWINDOW_H

@@ -26,7 +26,9 @@
 #include <QStyle>
 #include <QtConcurrent/QtConcurrent>
 #include <QtWinExtras/QtWin>
-#include <QMessageBox>
+#include <QMenu>
+#include <QAction>
+#include <QClipboard>
 #include <psapi.h>
 ProcessMonitor::ProcessMonitor(QSettings*   settings,
                                QTreeWidget* treeWidget,
@@ -55,6 +57,9 @@ ProcessMonitor::ProcessMonitor(QSettings*   settings,
 
     this->startBridge32();
     this->startBridge64();
+
+    m_treeWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_treeWidget, &QTreeWidget::customContextMenuRequested, this, &ProcessMonitor::showContextMenu);
 
     init();
     refresh();
@@ -150,6 +155,60 @@ ProcessMonitor::onItemChanged(QTreeWidgetItem* item, int column)
     }
 }
 
+void ProcessMonitor::showContextMenu(const QPoint& pos)
+{
+    QTreeWidgetItem* item = m_treeWidget->itemAt(pos);
+    if (!item) return;
+
+    QMenu menu(m_treeWidget);
+    QAction* openAction = menu.addAction(tr("打开文件夹"));
+    connect(openAction, &QAction::triggered, this, &ProcessMonitor::openFolder);
+    
+    QAction* copyPathAction = menu.addAction(tr("复制完整路径"));
+    connect(copyPathAction, &QAction::triggered, [this, item]() {
+        DWORD pid = item->text(1).toUInt();
+        QString path = winutils::getProcessPath(pid);
+        if (!path.isEmpty()) {
+            QApplication::clipboard()->setText(path);
+        }
+    });
+
+    menu.addSeparator();
+
+    QAction* terminateAction = menu.addAction(tr("终止进程"));
+    connect(terminateAction, &QAction::triggered, this, &ProcessMonitor::terminateProcess);
+
+    menu.exec(m_treeWidget->mapToGlobal(pos));
+}
+
+void ProcessMonitor::openFolder()
+{
+    QTreeWidgetItem* item = m_treeWidget->currentItem();
+    if (item) {
+        DWORD pid = item->text(1).toUInt();
+        winutils::openProcessFolder(pid);
+    }
+}
+
+void ProcessMonitor::terminateProcess()
+{
+    QTreeWidgetItem* item = m_treeWidget->currentItem();
+    if (item) {
+        DWORD pid = item->text(1).toUInt();
+        QString name = item->text(0);
+        if (QMessageBox::question(nullptr, tr("终止进程"),
+                                  tr("确定要结束进程 %1 (PID: %2) 吗？").arg(name).arg(pid)) 
+            == QMessageBox::Yes) 
+        {
+            if (winutils::terminateProcess(pid)) {
+                refresh();
+            } else {
+                QMessageBox::warning(nullptr, tr("错误"), tr("无法结束该进程"));
+            }
+        }
+    }
+}
+
 void
 ProcessMonitor::init()
 {
@@ -168,6 +227,7 @@ ProcessMonitor::dump()
 void
 ProcessMonitor::update(const QList<ProcessInfo>& processList)
 {
+    m_treeWidget->setUpdatesEnabled(false);
     // 跟踪现有进程，用于确定哪些已终止
     QSet<DWORD> currentPids;
     for (const ProcessInfo& info : processList)
@@ -310,6 +370,7 @@ ProcessMonitor::update(const QList<ProcessInfo>& processList)
             m_processItems[info.pid] = item;
         }
     }
+    m_treeWidget->setUpdatesEnabled(true);
 }
 
 void
@@ -456,13 +517,20 @@ QIcon
 ProcessMonitor::getProcessIconCached(DWORD processId)
 {
     QString processPath = winutils::getProcessPath(processId);
-    if (m_iconCache.contains(processPath))
+    QString cacheKey = processPath;
+    if (cacheKey.isEmpty()) {
+        cacheKey = QString("PID_%1").arg(processId);
+    }
+    
+    if (m_iconCache.contains(cacheKey))
     {
-        return m_iconCache[processPath];
+        return m_iconCache[cacheKey];
     }
 
     QIcon icon = getProcessIcon(processPath);
-    m_iconCache.insert(processPath, icon);
+    if (!icon.isNull()) {
+        m_iconCache.insert(cacheKey, icon);
+    }
     return icon;
 }
 
