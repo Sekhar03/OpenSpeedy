@@ -33,6 +33,8 @@ void ThemeUtils::applyTheme(Theme theme)
         }
     } else if (theme == Dark) {
         setDarkTheme();
+    } else if (theme == Modern) {
+        setModernTheme();
     } else {
         setLightTheme();
     }
@@ -70,6 +72,47 @@ void ThemeUtils::setDarkTheme()
 
     app->setPalette(darkPalette);
     app->setStyleSheet("QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }");
+}
+
+void ThemeUtils::setModernTheme()
+{
+    QApplication* app = static_cast<QApplication*>(QApplication::instance());
+    if (!app) return;
+
+    app->setStyle(QStyleFactory::create("Fusion"));
+
+    QPalette modernPalette;
+    QColor baseColor = QColor(25, 25, 25);
+    QColor accentColor = QColor(98, 197, 85); // Tech Green
+    
+    modernPalette.setColor(QPalette::Window, baseColor);
+    modernPalette.setColor(QPalette::WindowText, QColor(230, 230, 230));
+    modernPalette.setColor(QPalette::Base, QColor(15, 15, 15));
+    modernPalette.setColor(QPalette::AlternateBase, baseColor);
+    modernPalette.setColor(QPalette::Text, Qt::white);
+    modernPalette.setColor(QPalette::Button, QColor(45, 45, 45));
+    modernPalette.setColor(QPalette::ButtonText, Qt::white);
+    modernPalette.setColor(QPalette::Highlight, accentColor);
+    modernPalette.setColor(QPalette::HighlightedText, Qt::black);
+
+    app->setPalette(modernPalette);
+
+    QString qss = 
+        "QMainWindow { background-color: #1a1a1a; }"
+        "QGroupBox { font-weight: bold; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; margin-top: 15px; padding-top: 10px; background-color: rgba(255, 255, 255, 0.03); }"
+        "QGroupBox::title { subcontrol-origin: margin; subcontrol-position: top left; left: 15px; padding: 0 5px; color: #62C555; }"
+        "QPushButton#sliderLabel { background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #62C555, stop:1 #4CAF50); border-radius: 20px; color: white; font-weight: bold; border: none; }"
+        "QPushButton#sliderLabel:hover { background: #73d666; }"
+        "QSlider::groove:horizontal { border: 1px solid rgba(255, 255, 255, 0.1); height: 6px; background: rgba(255, 255, 255, 0.05); margin: 2px 0; border-radius: 3px; }"
+        "QSlider::handle:horizontal { background: #62C555; border: 1px solid #4CAF50; width: 18px; height: 18px; margin: -7px 0; border-radius: 9px; }"
+        "QLineEdit#processNameFilter { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 15px; padding: 5px 15px; color: white; selection-background-color: #62C555; }"
+        "QLineEdit#processNameFilter:focus { border: 1px solid #62C555; background: rgba(255, 255, 255, 0.08); }"
+        "QTreeWidget { background-color: transparent; border: none; outline: none; }"
+        "QTreeWidget::item { height: 35px; border-bottom: 1px solid rgba(255, 255, 255, 0.02); }"
+        "QTreeWidget::item:selected { background-color: rgba(98, 197, 85, 0.15); color: #62C555; border-radius: 4px; }"
+        "QHeaderView::section { background-color: rgba(30, 30, 30, 0.8); color: #888; padding: 5px; border: none; border-bottom: 1px solid rgba(255, 255, 255, 0.1); font-weight: bold; }";
+
+    app->setStyleSheet(qss);
 }
 
 void ThemeUtils::setLightTheme()

@@ -121,24 +121,57 @@ void MainWindow::refresh()
 
 void MainWindow::on_sliderCtrl_valueChanged(int value)
 {
-    double factor = speedFactor(value);
+    m_targetFactor = speedFactor(value);
+    
+    // If not ramping, change speed immediately based on smooth preference
+    // actually we always ramp if smooth is enabled, or just start the timer
+    m_rampingTimer->start(16); // ~60fps updates
 
-    m_processMonitor->changeSpeed(factor);
-
-    if (factor >= 1.0)
+    if (m_targetFactor >= 1.0)
     {
-        ui->sliderCtrl->setToolTip(QString(tr("%1倍")).arg(factor, 0, 'f', 2));
-        ui->sliderLabel->setText(QString(tr("✖️%1倍")).arg(factor, 0, 'f', 2));
+        ui->sliderCtrl->setToolTip(QString(tr("%1倍")).arg(m_targetFactor, 0, 'f', 2));
+        ui->sliderLabel->setText(QString(tr("✖️%1倍")).arg(m_targetFactor, 0, 'f', 2));
     }
     else
     {
-        ui->sliderCtrl->setToolTip(QString(tr("%1倍")).arg(factor, 0, 'f'));
-        ui->sliderLabel->setText(QString(tr("✖️%1倍")).arg(factor, 0, 'f'));
+        ui->sliderCtrl->setToolTip(QString(tr("%1倍")).arg(m_targetFactor, 0, 'f'));
+        ui->sliderLabel->setText(QString(tr("✖️%1倍")).arg(m_targetFactor, 0, 'f'));
     }
 
-    ui->sliderInputSpinBox->setValue(factor);
+    ui->sliderInputSpinBox->setValue(m_targetFactor);
     m_settings->setValue(CONFIG_SLIDERVALUE_KEY, value);
     m_settings->sync();
+}
+
+void MainWindow::updateRamping()
+{
+    if (qAbs(m_currentFactor - m_targetFactor) < 0.001) {
+        m_currentFactor = m_targetFactor;
+        m_rampingTimer->stop();
+    } else {
+        // Move 10% of the way each frame for smooth eased transition
+        m_currentFactor += (m_targetFactor - m_currentFactor) * 0.1;
+    }
+    
+    m_processMonitor->changeSpeed(m_currentFactor);
+}
+
+void MainWindow::setMiniMode(bool enable)
+{
+    m_isMiniMode = enable;
+    if (enable) {
+        ui->processGroupBox->hide();
+        ui->osSpliter->hide();
+        ui->osLayout->hide();
+        this->setMinimumHeight(200);
+        this->resize(400, 200);
+    } else {
+        ui->processGroupBox->show();
+        ui->osSpliter->show();
+        ui->osLayout->show();
+        this->setMinimumHeight(480);
+        this->recreate();
+    }
 }
 
 void MainWindow::on_sliderInputSpinBox_editingFinished()
@@ -203,6 +236,8 @@ void MainWindow::createTray()
     trayMenu = new QMenu(this);
     showAction = new QAction(tr("显示"), this);
     hideAction = new QAction(tr("隐藏"), this);
+    QAction* miniAction = new QAction(tr("精简模式"), this);
+    miniAction->setCheckable(true);
     quitAction = new QAction(tr("退出"), this);
 
     // 连接信号和槽
@@ -213,11 +248,13 @@ void MainWindow::createTray()
         activateWindow();
     });
     connect(hideAction, &QAction::triggered, this, &MainWindow::hide);
+    connect(miniAction, &QAction::toggled, this, &MainWindow::setMiniMode);
     connect(quitAction, &QAction::triggered, qApp, &QApplication::quit);
 
     // 添加动作到菜单
     trayMenu->addAction(showAction);
     trayMenu->addAction(hideAction);
+    trayMenu->addAction(miniAction);
     trayMenu->addSeparator();
     trayMenu->addAction(quitAction);
 
@@ -326,6 +363,12 @@ void MainWindow::init()
     refresh();
     connect(m_timer, &QTimer::timeout, this, &MainWindow::refresh);
     m_timer->start(1000);
+
+    m_rampingTimer = new QTimer(this);
+    connect(m_rampingTimer, &QTimer::timeout, this, &MainWindow::updateRamping);
+    m_currentFactor = 1.0;
+    m_targetFactor = 1.0;
+    m_isMiniMode = false;
 
     /* 读取slider值 */
     int value = qBound(ui->sliderCtrl->minimum(),
@@ -437,15 +480,21 @@ void MainWindow::init()
     m_themeGroup->setEnabled(true);
     m_themeGroup->addAction(ui->actionLightTheme);
     m_themeGroup->addAction(ui->actionDarkTheme);
+    m_themeGroup->addAction(ui->actionModernTheme);
     
-    int theme = m_settings->value(CONFIG_THEME, ThemeUtils::Light).toInt();
+    int theme = m_settings->value(CONFIG_THEME, ThemeUtils::Modern).toInt(); // Default to Modern for new users!
     if (theme == ThemeUtils::Light)
     {
         ui->actionLightTheme->setChecked(true);
     }
-    else
+    else if (theme == ThemeUtils::Dark)
     {
         ui->actionDarkTheme->setChecked(true);
+    }
+    else
+    {
+        ui->actionModernTheme->setChecked(true);
+        ThemeUtils::applyTheme(ThemeUtils::Modern); // Apply immediately on startup
     }
 
     connect(ui->actionLightTheme, &QAction::triggered,
@@ -453,7 +502,7 @@ void MainWindow::init()
     {
         m_settings->setValue(CONFIG_THEME, ThemeUtils::Light);
         ThemeUtils::applyTheme(ThemeUtils::Light);
-        refresh(); // 刷新界面以更新颜色
+        refresh();
     });
 
     connect(ui->actionDarkTheme, &QAction::triggered,
@@ -461,7 +510,15 @@ void MainWindow::init()
     {
         m_settings->setValue(CONFIG_THEME, ThemeUtils::Dark);
         ThemeUtils::applyTheme(ThemeUtils::Dark);
-        refresh(); // 刷新界面以更新颜色
+        refresh();
+    });
+
+    connect(ui->actionModernTheme, &QAction::triggered,
+            [this]
+    {
+        m_settings->setValue(CONFIG_THEME, ThemeUtils::Modern);
+        ThemeUtils::applyTheme(ThemeUtils::Modern);
+        refresh();
     });
 }
 

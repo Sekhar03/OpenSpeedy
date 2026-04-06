@@ -100,11 +100,21 @@ class MainWindow
 
     int sliderValue(double speedFactor);
 
+    void setMiniMode(bool enable);
+
+  private slots:
+    void updateRamping();
+
   protected:
     void closeEvent(QCloseEvent* event) override;
 
     bool nativeEventFilter(const QByteArray& eventType,
                            void* message,
                            long* result) override;
+
+    double m_targetFactor;
+    double m_currentFactor;
+    QTimer* m_rampingTimer;
+    bool m_isMiniMode;
 };
 #endif // MAINWINDOW_H
